@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jigsaw Puzzle</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,500;1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f0e8;
+      --surface: #fffef9;
+      --border: #d8d0c0;
+      --accent: #c1440e;
+      --accent2: #2a5e4f;
+      --text: #1a1612;
+      --muted: #7a6f60;
+      --piece-border: rgba(0,0,0,0.15);
+      --snap-color: #2a5e4f;
+    }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* grain texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo {
+      font-family: 'Fraunces', serif;
+      font-size: 1.5rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .logo span {
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .header-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Upload screen */
+    #upload-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      width: 100%;
+      max-width: 520px;
+      gap: 2rem;
+      padding: 3rem 0;
+    }
+
+    .upload-heading {
+      text-align: center;
+    }
+
+    .upload-heading h1 {
+      font-family: 'Fraunces', serif;
+      font-size: 2.8rem;
+      font-weight: 300;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+
+    .upload-heading h1 em {
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .upload-heading p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    #drop-zone {
+      width: 100%;
+      border: 1.5px dashed var(--border);
+      border-radius: 4px;
+      padding: 3.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface);
+    }
+
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: #fff9f5;
+    }
+
+    #drop-zone svg { margin-bottom: 1rem; opacity: 0.5; }
+
+    #drop-zone p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    #drop-zone strong {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    #file-input { display: none; }
+
+    /* Game screen */
+    #game-screen { display: none; width: 100%; max-width: 680px; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar label {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    select {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+    }
+
+    select:focus { border-color: var(--accent); }
+
+    .btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover { background: #a33a0c; border-color: #a33a0c; color: white; }
+
+    .progress-tag {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    #board-wrap {
+      position: relative;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    #preview-canvas {
+      display: block;
+      position: absolute;
+      top: 0; left: 0;
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    #board {
+      position: relative;
+    }
+
+    .piece {
+      position: absolute;
+      cursor: grab;
+      border: 1.5px solid var(--piece-border);
+      box-sizing: border-box;
+      transition: box-shadow 0.1s;
+    }
+
+    .piece:active { cursor: grabbing; }
+
+    .piece.dragging {
+      box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+      z-index: 1000;
+      border-color: var(--accent);
+    }
+
+    .piece.snapped {
+      border-color: var(--snap-color);
+      border-width: 2px;
+      cursor: default;
+    }
+
+    /* Win overlay */
+    #win-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(245, 240, 232, 0.92);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    #win-overlay.show { display: flex; }
+
+    #win-overlay h2 {
+      font-family: 'Fraunces', serif;
+      font-size: 2rem;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+    }
+
+    #win-overlay h2 em { color: var(--accent); font-style: italic; }
+
+    #win-overlay p {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      border-top: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">piece<span>work</span></div>
+  <div class="header-meta">jigsaw puzzle</div>
+</header>
+
+<main>
+  <!-- Upload screen -->
+  <div id="upload-screen">
+    <div class="upload-heading">
+      <h1>Turn any photo into<br>a <em>puzzle</em></h1>
+      <p>Upload an image to get started</p>
+    </div>
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="image/*">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="22" width="28" height="10" rx="3" stroke="#1a1612" stroke-width="1.5"/>
+        <path d="M18 4v16M11 11l7-7 7 7" stroke="#1a1612" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p><strong>Click to upload</strong> or drag & drop<br>JPG, PNG, WEBP — any size</p>
+    </div>
+  </div>
+
+  <!-- Game screen -->
+  <div id="game-screen">
+    <div class="toolbar">
+      <label>Grid</label>
+      <select id="grid-select">
+        <option value="3">3 × 3 — easy</option>
+        <option value="4" selected>4 × 4 — medium</option>
+        <option value="5">5 × 5 — hard</option>
+        <option value="6">6 × 6 — expert</option>
+      </select>
+      <button class="btn btn-primary" onclick="startPuzzle()">Shuffle</button>
+      <button class="btn" onclick="toggleGhost()">Toggle guide</button>
+      <button class="btn" onclick="resetUpload()">New photo</button>
+      <span class="progress-tag" id="progress-text"></span>
+    </div>
+
+    <div id="board-wrap">
+      <canvas id="preview-canvas"></canvas>
+      <div id="board"></div>
+      <div id="win-overlay">
+        <h2>Puzzle <em>complete!</em></h2>
+        <p>The image is whole again.</p>
+        <button class="btn btn-primary" onclick="startPuzzle(); document.getElementById('win-overlay').classList.remove('show');" style="margin-top:0.5rem;">Play again</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>piecework &mdash; drag, drop, solve</footer>
+
+<script>
+  let imgSrc = null, gridN = 4, boardW = 0, boardH = 0, pieces = [], snapTolerance = 30, ghostVisible = true;
+
+  const fileInput = document.getElementById('file-input');
+  const dropZone = document.getElementById('drop-zone');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) loadImage(f);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadImage(fileInput.files[0]); });
+
+  function loadImage(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      imgSrc = e.target.result;
+      document.getElementById('upload-screen').style.display = 'none';
+      document.getElementById('game-screen').style.display = 'block';
+      startPuzzle();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetUpload() {
+    imgSrc = null;
+    document.getElementById('upload-screen').style.display = 'flex';
+    document.getElementById('game-screen').style.display = 'none';
+    document.getElementById('win-overlay').classList.remove('show');
+    fileInput.value = '';
+  }
+
+  function toggleGhost() {
+    ghostVisible = !ghostVisible;
+    document.getElementById('preview-canvas').style.opacity = ghostVisible ? '0.15' : '0';
+  }
+
+  function startPuzzle() {
+    gridN = parseInt(document.getElementById('grid-select').value);
+    document.getElementById('win-overlay').classList.remove('show');
+
+    const maxW = Math.min(640, window.innerWidth - 48);
+    const img = new Image();
+    img.onload = () => {
+      const ratio = img.height / img.width;
+      boardW = maxW;
+      boardH = Math.round(maxW * ratio);
+
+      const wrap = document.getElementById('board-wrap');
+      wrap.style.width = boardW + 'px';
+      wrap.style.height = boardH + 'px';
+
+      const canvas = document.getElementById('preview-canvas');
+      canvas.width = boardW; canvas.height = boardH;
+      canvas.style.width = boardW + 'px'; canvas.style.height = boardH + 'px';
+      canvas.getContext('2d').drawImage(img, 0, 0, boardW, boardH);
+
+      buildPieces(img);
+    };
+    img.src = imgSrc;
+  }
+
+  function buildPieces(img) {
+    const board = document.getElementById('board');
+    board.innerHTML = '';
+    board.style.width = boardW + 'px';
+    board.style.height = boardH + 'px';
+
+    const pw = Math.floor(boardW / gridN);
+    const ph = Math.floor(boardH / gridN);
+    pieces = [];
+
+    for (let r = 0; r < gridN; r++) {
+      for (let c = 0; c < gridN; c++) {
+        const cvs = document.createElement('canvas');
+        cvs.width = pw; cvs.height = ph;
+        cvs.getContext('2d').drawImage(img,
+          c * (img.width / gridN), r * (img.height / gridN),
+          img.width / gridN, img.height / gridN,
+          0, 0, pw, ph);
+
+        const el = document.createElement('div');
+        el.className = 'piece';
+        el.style.width = pw + 'px';
+        el.style.height = ph + 'px';
+        el.style.backgroundImage = `url(${cvs.toDataURL()})`;
+        el.style.backgroundSize = 'cover';
+        el.dataset.targetX = c * pw;
+        el.dataset.targetY = r * ph;
+        el.dataset.snapped = 'false';
+
+        const angle = (Math.random() - 0.5) * 22;
+        el.style.left = Math.random() * (boardW - pw) + 'px';
+        el.style.top = Math.random() * (boardH - ph) + 'px';
+        el.style.transform = `rotate(${angle}deg)`;
+
+        makeDraggable(el);
+        board.appendChild(el);
+        pieces.push(el);
+      }
+    }
+    updateProgress();
+  }
+
+  function makeDraggable(el) {
+    let startX, startY, origLeft, origTop;
+
+    function onDown(e) {
+      if (el.dataset.snapped === 'true') return;
+      e.preventDefault();
+      el.classList.add('dragging');
+      el.style.zIndex = 999;
+      const pt = e.touches ? e.touches[0] : e;
+      startX = pt.clientX; startY = pt.clientY;
+      origLeft = parseFloat(el.style.left);
+      origTop = parseFloat(el.style.top);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onUp);
+    }
+
+    function onMove(e) {
+      e.preventDefault();
+      const pt = e.touches ? e.touches[0] : e;
+      const dx = pt.clientX - startX, dy = pt.clientY - startY;
+      el.style.left = Math.max(0, Math.min(boardW - parseFloat(el.style.width), origLeft + dx)) + 'px';
+      el.style.top = Math.max(0, Math.min(boardH - parseFloat(el.style.height), origTop + dy)) + 'px';
+    }
+
+    function onUp() {
+      el.classList.remove('dragging');
+      el.style.zIndex = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+      trySnap(el);
+    }
+
+    el.addEventListener('mousedown', onDown);
+    el.addEventListener('touchstart', onDown, { passive: false });
+  }
+
+  function trySnap(el) {
+    const tx = parseFloat(el.dataset.targetX);
+    const ty = parseFloat(el.dataset.targetY);
+    if (Math.abs(parseFloat(el.style.left) - tx) < snapTolerance &&
+        Math.abs(parseFloat(el.style.top) - ty) < snapTolerance) {
+      el.style.left = tx + 'px';
+      el.style.top = ty + 'px';
+      el.style.transform = 'rotate(0deg)';
+      el.dataset.snapped = 'true';
+      el.classList.add('snapped');
+    }
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const done = pieces.filter(p => p.dataset.snapped === 'true').length;
+    document.getElementById('progress-text').textContent = done + ' / ' + pieces.length + ' placed';
+    if (done === pieces.length && pieces.length > 0) {
+      setTimeout(() => document.getElementById('win-overlay').classList.add('show'), 400);
+    }
+  }
+</script>
+</body>
+</html>
